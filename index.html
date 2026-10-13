@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14213d">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>Workout Tracker</title>
+<style>
+:root{--bg:#f2f4f6;--card:#fff;--ink:#14213d;--mute:#5b6678;--line:#d9dee5;--acc:#e8590c;--ok:#2b8a5a}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1624;--card:#18223a;--ink:#eef1f6;--mute:#9aa6bb;--line:#2a3652;--acc:#ff8a4c;--ok:#5cc596}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-top:env(safe-area-inset-top,0px)}
+main{max-width:640px;margin:0 auto;padding:16px 16px calc(84px + env(safe-area-inset-bottom,0px))}
+h1{font-size:26px;margin:0 0 2px}
+h2{font-size:20px;margin:22px 0 8px}
+.mute{color:var(--mute);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:10px}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:12px}
+.days button,.btn{font:600 14px inherit;font-family:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:10px 0;cursor:pointer}
+.days button[aria-selected=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.days button.today{box-shadow:inset 0 -3px 0 var(--acc)}
+.btn{padding:11px 16px}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.del{color:#c0392b}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.ex h3{font-size:17px;margin:0}
+.sets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+input{width:100%;font:inherit;padding:10px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);text-align:center}
+label.s{display:block;font-size:12px;color:var(--mute);text-align:center}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.entry{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;padding:14px 0;border:0;background:none;color:var(--mute);font:600 14px inherit;font-family:inherit;cursor:pointer}
+nav button[aria-selected=true]{color:var(--acc);box-shadow:inset 0 3px 0 var(--acc)}
+canvas{width:100%;height:200px;display:block}
+.seg{display:flex;gap:8px;margin-bottom:8px}
+.seg button{flex:1}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.note{font-size:14px;color:var(--mute);margin-top:8px}
+.timer{position:sticky;top:0;z-index:5;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:12px;display:grid;grid-template-columns:auto repeat(3,1fr) auto;gap:6px;align-items:center}
+.tt{font:700 26px ui-monospace,Menlo,Consolas,monospace;padding:0 6px}
+.timer .btn{padding:10px 6px}
+.timer .btn[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.timer.done{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc)}
+.auto{grid-column:1/-1;font-size:13px;color:var(--mute);display:flex;gap:8px;align-items:center}
+.auto input{width:auto}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>Workout Tracker</h1>
+<div class="mute">Data tersimpan hanya di HP ini</div>
+
+<section id="v-log">
+<div class="timer" id="timer"><div class="tt" id="tt">02:00</div>
+<button class="btn" data-s="60" aria-pressed="false">1:00</button><button class="btn" data-s="90" aria-pressed="false">1:30</button><button class="btn" data-s="120" aria-pressed="true">2:00</button>
+<button class="btn pri" id="tgo">Mulai</button>
+<label class="auto"><input type="checkbox" id="auto" checked> Timer mulai otomatis setelah isi rep (abs 1:00, lainnya 2:00)</label></div>
+<div class="days" id="days"></div>
+<div id="session"></div>
+</section>
+
+<section id="v-body" hidden>
+<div class="card">
+<div class="row"><div><label class="s">Tanggal</label><input type="date" id="bd"></div></div>
+<div class="row" style="margin-top:8px">
+<div><label class="s">Berat (kg)</label><input type="number" inputmode="decimal" step="0.1" id="bw"></div>
+<div><label class="s">Pinggang (cm)</label><input type="number" inputmode="decimal" step="0.1" id="bwa"></div>
+</div>
+<button class="btn pri" style="width:100%;margin-top:10px" id="bsave">Simpan</button>
+<div class="note" id="bmsg"></div>
+</div>
+<div class="card">
+<div class="seg"><button class="btn" id="m-w" aria-pressed="true">Berat</button><button class="btn" id="m-c" aria-pressed="false">Pinggang</button></div>
+<canvas id="chart"></canvas>
+<div class="note" id="delta"></div>
+</div>
+<h2>Riwayat</h2>
+<div class="card" id="hist"></div>
+</section>
+
+<section id="v-bk" hidden>
+<div class="card">
+<p style="margin-top:0">Hapus data Chrome akan ikut menghapus riwayat. Ekspor cadangan secara berkala.</p>
+<button class="btn pri" style="width:100%" id="exp">Ekspor cadangan</button>
+<button class="btn" style="width:100%;margin-top:8px" id="impb">Impor cadangan</button>
+<input type="file" id="imp" accept="application/json" hidden>
+<div class="note" id="bkmsg"></div>
+</div>
+<div class="card"><button class="btn del" style="width:100%" id="reset">Hapus semua data</button></div>
+</section>
+</main>
+<nav id="nav">
+<button data-v="log" aria-selected="true">Latihan</button>
+<button data-v="body" aria-selected="false">Progres</button>
+<button data-v="bk" aria-selected="false">Cadangan</button>
+</nav>
+<script>
+var W={
+push:{n:"Push + Abs",ex:["Regular push up","Tricep dips","Pike push up","Diamond push up","Crunch"],t:"Tempo tahan 1 detik di bawah dan atas. Rest 2 menit (abs 1 menit)."},
+pull:{n:"Pull",ex:["Barbell row","Close grip barbell row","Barbell shrugs","Hammer curl","Hand grip"],t:"Rest 2 menit."},
+leg:{n:"Leg + Abs",ex:["Squat","Lunges","Bulgarian split squat","Calf raises","Reverse crunch"],t:"Bulgarian dihitung per kaki. Rest 2 menit (abs 1 menit)."},
+rest:{n:"Istirahat",ex:[],t:"Tidak ada latihan beban. Jalan santai 1,2 km bila mau."}
+};
+var D=[["Sen","push"],["Sel","pull"],["Rab","leg"],["Kam","push"],["Jum","pull"],["Sab","leg"],["Min","rest"]];
+var SETS=4;
+var data={logs:{},body:[]};
+try{var raw=localStorage.getItem("wt:data");if(raw)data=JSON.parse(raw);if(!data.logs)data.logs={};if(!data.body)data.body=[]}catch(e){}
+function save(){try{localStorage.setItem("wt:data",JSON.stringify(data))}catch(e){alert("Gagal menyimpan data")}}
+function ds(d){d=d||new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+var $=function(i){return document.getElementById(i)};
+var today=(new Date().getDay()+6)%7,sel=today,mode="w";
+
+function last(name,before){
+  var ks=Object.keys(data.logs).filter(function(k){return k<before&&data.logs[k][name]}).sort();
+  return ks.length?data.logs[ks[ks.length-1]][name]:null;
+}
+function renderDays(){
+  var h="";D.forEach(function(d,i){h+='<button data-i="'+i+'" aria-selected="'+(i===sel)+'" class="'+(i===today?"today":"")+'">'+d[0]+'</button>'});
+  $("days").innerHTML=h;
+  $("days").querySelectorAll("button").forEach(function(b){b.onclick=function(){sel=+b.dataset.i;renderDays();renderSession()}});
+}
+function renderSession(){
+  var w=W[D[sel][1]],t=ds(),h='<h2>'+w.n+'</h2><div class="mute">'+w.t+' Dicatat untuk '+t+'.</div>';
+  if(!w.ex.length)h+='<div class="card">Hari istirahat.</div>';
+  w.ex.forEach(function(name,i){
+    var cur=(data.logs[t]||{})[name]||{r:[],kg:""},prev=last(name,t),ph="";
+    if(prev)ph='Terakhir: '+(prev.r.filter(Boolean).join(" / ")||"-")+(prev.kg?' (beban '+prev.kg+' kg)':"");
+    h+='<div class="card ex"><h3>'+name+'</h3><div class="mute">'+(ph||"Belum ada riwayat")+'</div><div class="sets">';
+    for(var s=0;s<SETS;s++)h+='<div><label class="s">Set '+(s+1)+'</label><input type="number" inputmode="numeric" data-n="'+i+'" data-s="'+s+'" value="'+(cur.r[s]||"")+'"></div>';
+    h+='</div><div style="margin-top:8px"><label class="s" style="text-align:left">Beban tambahan (kg, opsional)</label><input type="number" inputmode="decimal" step="0.5" data-n="'+i+'" data-kg="1" value="'+(cur.kg||"")+'"></div></div>';
+  });
+  $("session").innerHTML=h;
+  $("session").querySelectorAll("input").forEach(function(inp){inp.oninput=function(){
+    var name=w.ex[+inp.dataset.n];
+    data.logs[t]=data.logs[t]||{};
+    var e=data.logs[t][name]=data.logs[t][name]||{r:[],kg:""};
+    if(inp.dataset.kg)e.kg=inp.value;else e.r[+inp.dataset.s]=inp.value;
+    save();
+  };
+  if(!inp.dataset.kg)inp.onchange=function(){
+    if(inp.value&&$("auto").checked)startT(/crunch/i.test(w.ex[+inp.dataset.n])?60:120);
+  }});
+}
+
+function renderBody(){
+  var b=data.body.slice().sort(function(a,c){return a.d<c.d?-1:1});
+  var key=mode==="w"?"w":"c",unit=mode==="w"?" kg":" cm";
+  var pts=b.filter(function(x){return x[key]!==""&&x[key]!=null}).map(function(x){return{d:x.d,v:+x[key]}});
+  drawChart(pts);
+  $("delta").textContent=pts.length>1?"Perubahan sejak "+pts[0].d+": "+((pts[pts.length-1].v-pts[0].v)>0?"+":"")+(pts[pts.length-1].v-pts[0].v).toFixed(1)+unit:(pts.length?"Tambah data lagi untuk melihat tren.":"Belum ada data.");
+  var h="";b.slice().reverse().forEach(function(x){
+    h+='<div class="entry"><span>'+x.d+'<br><span class="mute">'+(x.w!==""?x.w+" kg":"-")+' / '+(x.c!==""?x.c+" cm":"-")+'</span></span><button class="btn del" data-d="'+x.d+'">Hapus</button></div>';
+  });
+  $("hist").innerHTML=h||'<div class="mute">Belum ada catatan.</div>';
+  $("hist").querySelectorAll("button").forEach(function(bt){bt.onclick=function(){
+    if(!confirm("Hapus catatan "+bt.dataset.d+"?"))return;
+    data.body=data.body.filter(function(x){return x.d!==bt.dataset.d});save();renderBody()}});
+}
+function drawChart(pts){
+  var c=$("chart"),dpr=window.devicePixelRatio||1,W_=c.clientWidth,H=c.clientHeight;
+  c.width=W_*dpr;c.height=H*dpr;var g=c.getContext("2d");g.scale(dpr,dpr);g.clearRect(0,0,W_,H);
+  var cs=getComputedStyle(document.documentElement),ink=cs.getPropertyValue("--mute").trim(),acc=cs.getPropertyValue("--acc").trim(),line=cs.getPropertyValue("--line").trim();
+  if(!pts.length)return;
+  var mn=Math.min.apply(null,pts.map(function(p){return p.v})),mx=Math.max.apply(null,pts.map(function(p){return p.v}));
+  if(mx===mn){mx+=1;mn-=1}var pad=(mx-mn)*.15;mn-=pad;mx+=pad;
+  var L=38,R=10,T=10,B=24,pw=W_-L-R,ph=H-T-B;
+  function X(i){return L+(pts.length===1?pw/2:pw*i/(pts.length-1))}
+  function Y(v){return T+ph*(1-(v-mn)/(mx-mn))}
+  g.strokeStyle=line;g.fillStyle=ink;g.font="11px system-ui";g.lineWidth=1;
+  for(var k=0;k<3;k++){var v=mn+(mx-mn)*k/2,y=Y(v);g.beginPath();g.moveTo(L,y);g.lineTo(W_-R,y);g.stroke();g.fillText(v.toFixed(0),2,y+4)}
+  g.strokeStyle=acc;g.fillStyle=acc;g.lineWidth=2.5;g.beginPath();
+  pts.forEach(function(p,i){i?g.lineTo(X(i),Y(p.v)):g.moveTo(X(i),Y(p.v))});g.stroke();
+  pts.forEach(function(p,i){g.beginPath();g.arc(X(i),Y(p.v),3.5,0,7);g.fill()});
+  g.fillStyle=ink;g.fillText(pts[0].d.slice(5),L,H-6);var e=pts[pts.length-1].d.slice(5);g.fillText(e,W_-R-g.measureText(e).width,H-6);
+}
+$("bd").value=ds();
+$("bsave").onclick=function(){
+  var d=$("bd").value,w=$("bw").value,c=$("bwa").value;
+  if(!d||(w===""&&c===""))return $("bmsg").textContent="Isi tanggal dan minimal satu angka.";
+  var ex=data.body.filter(function(x){return x.d===d})[0];
+  if(ex){if(w!=="")ex.w=w;if(c!=="")ex.c=c}else data.body.push({d:d,w:w,c:c});
+  save();$("bw").value="";$("bwa").value="";$("bmsg").textContent="Tersimpan.";renderBody();
+};
+$("m-w").onclick=function(){mode="w";$("m-w").setAttribute("aria-pressed",true);$("m-c").setAttribute("aria-pressed",false);renderBody()};
+$("m-c").onclick=function(){mode="c";$("m-c").setAttribute("aria-pressed",true);$("m-w").setAttribute("aria-pressed",false);renderBody()};
+
+$("exp").onclick=function(){
+  var blob=new Blob([JSON.stringify(data)],{type:"application/json"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download="workout-backup-"+ds()+".json";document.body.appendChild(a);a.click();a.remove();
+  $("bkmsg").textContent="File cadangan diunduh.";
+};
+$("impb").onclick=function(){$("imp").click()};
+$("imp").onchange=function(){
+  var f=this.files[0];if(!f)return;var r=new FileReader();
+  r.onload=function(){try{var j=JSON.parse(r.result);if(!j.logs||!j.body)throw 0;
+    if(!confirm("Data saat ini akan diganti dengan cadangan. Lanjut?"))return;
+    data=j;save();$("bkmsg").textContent="Cadangan dipulihkan.";renderSession();renderBody()}catch(e){$("bkmsg").textContent="File cadangan tidak valid."}};
+  r.readAsText(f);
+};
+$("reset").onclick=function(){if(confirm("Hapus SEMUA data? Tidak bisa dibatalkan.")&&confirm("Yakin?")){data={logs:{},body:[]};save();renderSession();renderBody()}};
+
+var tEnd=0,tSel=120,tInt=null,actx=null;
+function fmt(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function audio(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==="suspended")actx.resume()}catch(e){}}
+function beep(){
+  try{navigator.vibrate&&navigator.vibrate([300,150,300,150,300])}catch(e){}
+  try{audio();[0,.35,.7].forEach(function(t){var o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;g.gain.value=.25;o.connect(g);g.connect(actx.destination);o.start(actx.currentTime+t);o.stop(actx.currentTime+t+.2)})}catch(e){}
+}
+function pick(s){tSel=s;document.querySelectorAll(".timer [data-s]").forEach(function(b){b.setAttribute("aria-pressed",+b.dataset.s===s)})}
+function tick(){
+  var r=Math.max(0,Math.ceil((tEnd-Date.now())/1000));$("tt").textContent=fmt(r);
+  if(r===0){clearInterval(tInt);tInt=null;tEnd=0;$("tgo").textContent="Mulai";$("timer").classList.add("done");beep();setTimeout(function(){$("timer").classList.remove("done");$("tt").textContent=fmt(tSel)},4000)}
+}
+function startT(s){pick(s);audio();$("timer").classList.remove("done");tEnd=Date.now()+s*1000;clearInterval(tInt);tInt=setInterval(tick,250);$("tgo").textContent="Stop";tick()}
+function stopT(){clearInterval(tInt);tInt=null;tEnd=0;$("tgo").textContent="Mulai";$("tt").textContent=fmt(tSel)}
+document.querySelectorAll(".timer [data-s]").forEach(function(b){b.onclick=function(){if(tInt)startT(+b.dataset.s);else{pick(+b.dataset.s);$("tt").textContent=fmt(tSel)}}});
+$("tgo").onclick=function(){tInt?stopT():startT(tSel)};
+document.addEventListener("visibilitychange",function(){if(tInt)tick()});
+try{$("auto").checked=localStorage.getItem("wt:auto")!=="0"}catch(e){}
+$("auto").onchange=function(){try{localStorage.setItem("wt:auto",this.checked?"1":"0")}catch(e){}};
+document.querySelectorAll("nav button").forEach(function(b){b.onclick=function(){
+  document.querySelectorAll("nav button").forEach(function(x){x.setAttribute("aria-selected",x===b)});
+  ["log","body","bk"].forEach(function(v){$("v-"+v).hidden=v!==b.dataset.v});
+  if(b.dataset.v==="body")renderBody();window.scrollTo(0,0);
+}});
+renderDays();renderSession();
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
+</script>
+</body>
+</html>
